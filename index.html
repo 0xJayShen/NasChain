@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <meta name="viewport"
+          content="width=device-width,initial-scale=0.5, maximum-scale=0.5, minimum-scale=0.5, user-scalable=no">
+    <meta name="x5-fullscreen" content="true">
+    <meta name="full-screen" content="yes">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.8/css/materialize.min.css">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <title>星云投票</title>
+
+    <style>
+
+    </style>
+</head>
+<body>
+<div class="row" style="margin-top: 50px;">
+    <div class="col offset-s2 s8">
+        <div class="col s6">
+            <p>1.导入钱包文件方式登录</p>
+            <div class="file-field input-field ">
+                <div class="btn">
+                    <span>点击选择您的密钥文件</span>
+                    <input type="file" id="keyfile">
+                </div>
+                <div class="file-path-wrapper">
+                    <input class="file-path validate" type="text">
+                </div>
+            </div>
+            <div id="keyfilepassworddiv" style="display: none">
+                <label for="keyfilepassword" class="active">请输入您的密钥文件密码</label>
+                <input placeholder="请输入您的密钥文件密码" class="center-align" id="keyfilepassword" type="password">
+            </div>
+            <p style="margin-top: 100px">2.输入秘钥方式登录</p>
+            <div>
+                <label for="privatekey" class="active">请输入您的密钥（Private Key）</label>
+                <input placeholder="请输入您的密钥（Private Key）" class="center-align" id="privatekey" type="password">
+            </div>
+        </div>
+        <div class="offset-s1 col s5">
+            <table class="bordered centered" style="margin-top: 45px;">
+                <tbody>
+                <tr>
+                    <td>NAS 地址</td>
+                    <td id="address"></td>
+                </tr>
+                <tr>
+                    <td>可用余额<br></td>
+                    <td id="balance"></td>
+                </tr>
+                </tbody>
+
+            </table>
+
+            <div style="margin-top: 50px">
+                <h4 style="text-align: center;">规则说明</h4>
+                <p style="padding-left: 100px;line-height: 28px">
+                    <span>1.余额大于0.5nas的地址可以发起一个为期7天的投票</span>
+                    <br>
+                    <span>2.余额大于0.1nas的地址可以投票,每个话题每个地址只能投票一次,结束投票后不能投票.</span>
+                    <br>
+                    <span>3.应用推广阶段,仅需支付 gas 即可发起投票和参与投票</span>
+                    <br>
+                    <span>4.因区块链网络速度影响,投票反馈可能不是很及时,见谅</span>
+                </p>
+            </div>
+
+
+        </div>
+
+
+    </div>
+</div>
+
+
+<a class="waves-effect waves-light btn startVote" href="#modal1" style="margin-left: 200px;margin-bottom: 30px">发起投票</a>
+
+
+<!-- Modal Structure -->
+<div id="modal1" class="modal">
+    <div class="modal-content">
+        <div class="row">
+            <form class="col s12">
+                <div class="row">
+                    <div class="input-field col s12">
+                        <input placeholder="例:你觉得彩礼钱有必要吗?" id="vote_title" type="text" class="validate">
+                        <label>投票主题描述</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input id="choice_a" type="text" class="validate" placeholder="例:没必要">
+                        <label>A选项</label>
+                    </div>
+                    <div class="input-field col s6">
+                        <input id="choice_b" type="text" class="validate" placeholder="例:有必要">
+                        <label>B选项</label>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <a href="#!" style="color: white;background-color: dodgerblue"
+           class="modal-action modal-close waves-effect waves-green btn-flat" id="newVote">
+            <i class="material-icons right">send</i>
+            提交
+        </a>
+    </div>
+</div>
+<table class="bordered" style="width: 80%;margin:  0 auto">
+    <thead>
+    <tr>
+        <th>话题描述</th>
+        <th>正方观点</th>
+        <th>反方观点</th>
+        <th>截止时间</th>
+    </tr>
+    </thead>
+    <tbody id="J_TbData">
+    </tbody>
+
+</table>
+
+</body>
+<script src=lib/jquery-3.3.1.min.js></script>
+
+<script src=lib/bootstrap-4.0.0-dist/js/bootstrap.min.js></script>
+<script src=lib/nebPay.js></script>
+<script src=lib/nebulas.js></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/0.97.8/js/materialize.min.js"></script>
+
+<script>
+    "use strict";
+
+    //
+    //    $(".add").click(function () {
+    //        neb.api.call({
+    //            chainID: chainid,
+    //            from: account.getAddressString(),
+    //            to: contractAddress,
+    //            value: amount * 1e18,
+    //            nonce: 0,
+    //            gasPrice: 1000000,
+    //            gasLimit: 2000000,
+    //            contract: {function: "newVote", args: JSON.stringify([hash])}
+    //        }).then(function (call) {
+    //
+    //        })
+    $(document).ready(function () {
+        $('.modal').modal();
+        var contractAddress = "n1gPtiRSw6uLDt2crHnz81parkcZvm2dry3";
+        var HttpRequest = require("nebulas").HttpRequest;
+        var Neb = require("nebulas").Neb;
+        var Account = require("nebulas").Account;
+        var account = null;
+        var keyfile = null;
+        var Transaction = require("nebulas").Transaction;
+        var neb = new Neb();
+        var balance = 0;
+        var chainid = 1;
+        neb.setRequest(new HttpRequest("https://mainnet.nebulas.io"));
+
+        $('#privatekey').change(function () {
+            if ($('#privatekey')[0].value.trim().length === 64) {
+                Materialize.toast('正在查询地址信息', 3000);
+                account = new Account($("#privatekey")[0].value.trim());
+                $('#address').text(account.getAddressString());
+                neb.api.getAccountState({address: account.getAddressString()}).then(function (state) {
+                    balance = state.balance / 1e18
+                    $('#balance').text(state.balance / 1e18 + ' NAS');
+                    Materialize.toast('信息查询成功', 3000);
+
+                });
+            }
+
+        });
+
+        $('#keyfile').change(function (e) {
+            var $this = $(this), file = e.target.files[0], fr = new FileReader();
+            fr.onload = onload;
+            fr.readAsText(file);
+
+            function onload(e) {
+                try {
+                    keyfile = JSON.parse(e.target.result);
+                    $('#keyfilepassworddiv').show();
+                } catch (e) {
+                    Materialize.toast(e, 3000);
+                    return;
+                }
+            }
+        });
+        $('#keyfilepassword').change(function (e) {
+            Materialize.toast('正在查询地址信息', 3000);
+            account = new Account();
+            try {
+                account.fromKey(keyfile, $('#keyfilepassword')[0].value.trim());
+            } catch (e) {
+                Materialize.toast(e, 3000);
+                return;
+            }
+            $('#address').text(account.getAddressString());
+            neb.api.getAccountState({address: account.getAddressString()}).then(function (state) {
+                balance = state.balance / 1e18
+                $('#balance').text(state.balance / 1e18 + ' NAS');
+                Materialize.toast('信息查询成功', 3000);
+            });
+        });
+        //        if (balance < 0.0000) {
+//            $(".startVote").addClass("disabled")
+//            $("#choice_a_ticket").addClass("disabled")
+//            $("#choice_b_ticket").addClass("disabled")
+//
+//        } else {
+//            $(".startVote").removeClass("disabled")
+//            $("#choice_a_ticket").removeClass("disabled")
+//            $("#choice_b_ticket").removeClass("disabled")
+//        }
+
+        $("#newVote").click(function () {
+            console.log(account);
+            if (account === null || account.getPrivateKey() === undefined) {
+                Materialize.toast('未登录钱包', 3000);
+                return;
+            }
+            var title = $("#vote_title").val();
+            var choice_a = $("#choice_a").val();
+            var choice_b = $("#choice_b").val();
+            neb.api.call({
+                chainID: chainid,
+                from: account.getAddressString(),
+                to: contractAddress,
+                value: 0.000001 * 1e18,
+                nonce: 0,
+                gasPrice: 1000000,
+                gasLimit: 2000000,
+                contract: {function: "newVote", args: JSON.stringify([title, choice_a, choice_b])}
+            }).then(function (call) {
+                if (call.execute_err === '') {
+                    neb.api.getAccountState({address: account.getAddressString()}).then(function (state) {
+                        $('#balance').text(state.balance / 1e18 + ' NAS');
+                        var tx = new Transaction({
+                            chainID: chainid,
+                            from: account,
+                            to: contractAddress,
+                            value: 0.000001 * 1e18,
+                            nonce: parseInt(state.nonce) + 1,
+                            gasPrice: 1000000,
+                            gasLimit: 2000000,
+                            contract: {function: "newVote", args: JSON.stringify([title, choice_a, choice_b])}
+
+                        });
+                        tx.signTransaction();
+                        neb.api.sendRawTransaction({data: tx.toProtoString()}).then(function (tx) {
+                            Materialize.toast('TXid: ' + tx.txhash, 5000);
+                        });
+                    });
+                } else {
+                    Materialize.toast(call.execute_err, 3000);
+                }
+            })
+        });
+
+        //这里先手动获取所有投票事件,之后改为自动渲染
+        function init() {
+            neb.api.call({
+                chainID: chainid,
+                from: "n1FZQojF4cKULiTqt42Ckw2ssDCLwyomaxg",
+                to: contractAddress,
+                value: 0,
+                nonce: 0,
+                gasPrice: 1000000,
+                gasLimit: 2000000,
+                contract: {function: "getAll", args: JSON.stringify([])}
+            }).then(function (call) {
+                if (call.execute_err === '') {
+                    var timestamp = Date.parse(new Date()) / 1000;
+                    var html = "";
+                    // $("#J_TbData").html(html);
+                    var result = JSON.parse(call.result);
+                    for (var i = 0; i < result.length; i++) {
+                        if (timestamp < result[i].endTime) {
+                            html += '<tr id=' + result[i].id + '>';
+                            html += "<td>" + result[i].title + "</td>";
+                            html += "<td>" + result[i].choice_a + "</td>";
+                            html += "<td>" + result[i].choice_b + "</td>";
+                            html += "<td>" + new Date(result[i].endTime * 1000).toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ") + "</td>";
+                            html += "        <td>\n" +
+                                "            <button class=\"btn waves-effect waves-light choice_a\" value=\"choice_a\">支持正方\n" + "(" + result[i].choice_a_tickets + ")" +
+                                "            </button>\n" +
+                                "        </td>";
+                            html += "        <td>\n" +
+                                "            <button class=\"btn waves-effect waves-light choice_b\"  value=\"choice_b\">支持反方\n" + "(" + result[i].choice_b_tickets + ")" +
+                                "            </button>\n" +
+                                "        </td>";
+
+                            html += "</tr>";
+                        } else {
+                            html += "<tr>";
+                            html += "<td>" + result[i].title + "</td>";
+                            html += "<td>" + result[i].choice_a + "</td>";
+                            html += "<td>" + result[i].choice_b + "</td>";
+                            html += "<td>" + new Date(result[i].endTime * 1000).toLocaleString().replace(/年|月/g, "-").replace(/日/g, " ") + "</td>";
+                            html += "        <td>\n" +
+                                "            <button class=\"btn disabled waves-effect waves-light choice_a\" >" + "正方" + result[i].choice_a_tickets + "人" +
+                                "            </button>\n" +
+                                "        </td>";
+                            html += "        <td>\n" +
+                                "            <button class=\"btn disabled waves-effect waves-light choice_b\" >" + "反方" + result[i].choice_b_tickets + "人" +
+                                "            </button>\n" +
+                                "        </td>";
+
+                            html += "</tr>";
+                        }
+                    }
+                    $("#J_TbData").html(html);
+
+                }
+            })
+        };
+        $(document).on("click", ".choice_a", function () {
+             if (account === null || account.getPrivateKey() === undefined) {
+                Materialize.toast('未登录钱包', 3000);
+                return;
+            }
+            var vote_id = $(this).parent().parent().attr("id");
+            $(this).addClass("disabled");
+            console.log(vote_id);
+            neb.api.call({
+                chainID: chainid,
+                from: account.getAddressString(),
+                to: contractAddress,
+                value: 0.000001 * 1e18,
+                nonce: 0,
+                gasPrice: 1000000,
+                gasLimit: 2000000,
+                contract: {function: "Voting", args: JSON.stringify([vote_id, "choice_a"])}
+            }).then(function (call) {
+                if (call.execute_err === '') {
+                    neb.api.getAccountState({address: account.getAddressString()}).then(function (state) {
+                        $('#balance').text(state.balance / 1e18 + ' NAS');
+                        var tx = new Transaction({
+                            chainID: chainid,
+                            from: account,
+                            to: contractAddress,
+                            value: 0.000001 * 1e18,
+                            nonce: parseInt(state.nonce) + 1,
+                            gasPrice: 1000000,
+                            gasLimit: 2000000,
+                            contract: {function: "Voting", args: JSON.stringify([vote_id, "choice_a"])}
+                        });
+                        tx.signTransaction();
+                        neb.api.sendRawTransaction({data: tx.toProtoString()}).then(function (tx) {
+                            Materialize.toast('TXid: ' + tx.txhash, 5000);
+                        });
+                    });
+                } else {
+                    Materialize.toast("您已为该话题投过票", 3000);
+                }
+            })
+        });
+        $(document).on("click", ".choice_b", function () {
+             if (account === null || account.getPrivateKey() === undefined) {
+                Materialize.toast('未登录钱包', 3000);
+                return;
+            }
+            var vote_id = $(this).parent().parent().attr("id");
+            $(this).addClass("disabled");
+            console.log(vote_id);
+            neb.api.call({
+                chainID: chainid,
+                from: account.getAddressString(),
+                to: contractAddress,
+                value: 0.000001 * 1e18,
+                nonce: 0,
+                gasPrice: 1000000,
+                gasLimit: 2000000,
+                contract: {function: "Voting", args: JSON.stringify([vote_id, "choice_b"])}
+            }).then(function (call) {
+                if (call.execute_err === '') {
+                    console.log(call.result);
+                    neb.api.getAccountState({address: account.getAddressString()}).then(function (state) {
+                        $('#balance').text(state.balance / 1e18 + ' NAS');
+                        var tx = new Transaction({
+                            chainID: chainid,
+                            from: account,
+                            to: contractAddress,
+                            value: 0.000001 * 1e18,
+                            nonce: parseInt(state.nonce) + 1,
+                            gasPrice: 1000000,
+                            gasLimit: 2000000,
+                            contract: {function: "Voting", args: JSON.stringify([vote_id, "choice_b"])}
+                        });
+                        tx.signTransaction();
+                        neb.api.sendRawTransaction({data: tx.toProtoString()}).then(function (tx) {
+                            Materialize.toast('TXid: ' + tx.txhash, 5000);
+                        });
+                    });
+                } else {
+                    Materialize.toast("您已为该话题投过票", 3000);
+                }
+            })
+        });
+        window.onload = init()
+    })
+    ;
+
+</script>
+</html>
